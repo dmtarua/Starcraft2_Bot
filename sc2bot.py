@@ -21,7 +21,7 @@ class XackaBot(sc2.BotAI):
 			self.NUM_REFINERY = 0
 			self.NUM_BARRACKS = 0
 			self.NUM_BREACTOR = 0
-			self.NUM_COMMANDCENTER = 0
+			self.NUM_COMMANDCENTER = 1
 			self.NUM_RESEARCHBAY = 0
 
 	async def on_step(self, iteration):
@@ -37,7 +37,7 @@ class XackaBot(sc2.BotAI):
 		await self.build_troops()
 		await self.attack()
 		await self.expand()
-		await self.check_expansion()
+		await self.check_build()
 
 	async def build_workers(self):
 		if (self.structures(UnitTypeId.COMMANDCENTER).amount * self.CENTER_WORKERS > self.units(UnitTypeId.SCV).amount and self.units(UnitTypeId.SCV).amount < self.MAX_WORKERS and self.supply_left >= 1):
@@ -69,14 +69,10 @@ class XackaBot(sc2.BotAI):
 
 	async def expand(self):
 		if (not self.already_pending(UnitTypeId.COMMANDCENTER) and self.can_afford(UnitTypeId.COMMANDCENTER) and self.structures(UnitTypeId.COMMANDCENTER).amount < self.NUM_COMMANDCENTER):
-			location = await self.get_next_expansion()
-			if location:
-				worker = self.select_build_worker(location)
-				if worker and self.can_afford(UnitTypeId.COMMANDCENTER):
-					worker.build(UnitTypeId.COMMANDCENTER, location)
+			await self.expand_now()
 
 	async def build_barracks(self):
-		if (not self.already_pending(UnitTypeId.BARRACKS) and self.can_afford(UnitTypeId.BARRACKS) and not self.structures(UnitTypeId.BARRACKS).amount > self.NUM_BARRACKS):
+		if (not self.already_pending(UnitTypeId.BARRACKS) and self.can_afford(UnitTypeId.BARRACKS) and self.structures(UnitTypeId.BARRACKS).amount < self.NUM_BARRACKS):
 			workers = self.workers.gathering
 			if workers:
 				worker = workers.furthest_to(workers.center)
@@ -85,7 +81,7 @@ class XackaBot(sc2.BotAI):
 					worker.build(UnitTypeId.BARRACKS, location)
 
 	async def build_barrack_reactors(self):
-		if(not self.already_pending(UnitTypeId.BARRACKSREACTOR) and not self.structures(UnitTypeId.BARRACKSREACTOR).amount > self.NUM_BREACTOR):
+		if(not self.already_pending(UnitTypeId.BARRACKSREACTOR) and self.structures(UnitTypeId.BARRACKSREACTOR).amount < self.NUM_BREACTOR):
 			for barrack in self.structures(UnitTypeId.BARRACKS).idle:
 				if (self.can_afford(UnitTypeId.BARRACKSREACTOR) and not barrack.has_add_on):
 					barrack.build(UnitTypeId.BARRACKSREACTOR)
@@ -112,11 +108,11 @@ class XackaBot(sc2.BotAI):
 			if (self.can_afford(UpgradeId.TERRANINFANTRYWEAPONSLEVEL1)):
 				bay.research(UpgradeId.TERRANINFANTRYWEAPONSLEVEL1)
 
-	async def check_expansion(self):
+	async def check_build(self):
 		if self.units(UnitTypeId.SCV).amount == 16:
-			self.NUM_COMMANDCENTER == 1
-		elif self.structures(UnitTypeId.COMMANDCENTER).amount == 1:
-			self.NUM_BARRACKS == 1
+			self.NUM_COMMANDCENTER = 2
+		elif self.structures(UnitTypeId.COMMANDCENTER).amount == 2:
+			self.NUM_BARRACKS = 1
 
 	async def attack(self):
 		if (self.units(UnitTypeId.MARINE).amount > 20):
@@ -134,6 +130,6 @@ class XackaBot(sc2.BotAI):
 			return self.enemy_start_locations[0]
 
 run_game(maps.get("Abyssal Reef LE"), [
-	Bot(Race.Terran, XackaBot(), fullscreen = True),
+	Bot(Race.Terran, XackaBot(), fullscreen = False),
 	Computer(Race.Terran, Difficulty.Medium)
 ], realtime = True)
