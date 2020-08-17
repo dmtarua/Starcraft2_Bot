@@ -23,6 +23,10 @@ class XackaBot(sc2.BotAI):
 			self.NUM_BREACTOR = 0
 			self.NUM_COMMANDCENTER = 1
 			self.NUM_RESEARCHBAY = 0
+			self.UNIT = UnitTypeId.MARINE
+			self.B_ACTIVATE = False
+			self.B_UPGRADE = UpgradeId.TERRANINFANTRYWEAPONSLEVEL1
+			self.UNIT_STACK_AMOUNT = 10
 
 	async def on_step(self, iteration):
 		self.iteration = iteration
@@ -33,9 +37,9 @@ class XackaBot(sc2.BotAI):
 		await self.build_barracks()
 		await self.build_barrack_reactors()
 		await self.build_bay()
-		await self.bay_research()
-		await self.build_troops()
-		await self.attack()
+		await self.bay_research(self.B_UPGRADE)
+		await self.build_troops(self.UNIT)
+		await self.attack(self.UNIT_STACK_AMOUNT)
 		await self.expand()
 		await self.check_build()
 
@@ -86,13 +90,13 @@ class XackaBot(sc2.BotAI):
 				if (self.can_afford(UnitTypeId.BARRACKSREACTOR) and not barrack.has_add_on):
 					barrack.build(UnitTypeId.BARRACKSREACTOR)
 
-	async def build_troops(self):
+	async def build_troops(self, unit):
 		for barrack_r in self.structures(UnitTypeId.BARRACKSREACTOR):
-			if (self.can_afford(UnitTypeId.MARINE) and self.supply_left >= 2 and len(barrack_r.orders) < 2):
-				barrack_r.train(UnitTypeId.MARINE)
+			if (self.can_afford(unit) and self.supply_left >= 2 and len(barrack_r.orders) < 2):
+				barrack_r.train(unit)
 		for barrack in self.structures(UnitTypeId.BARRACKS).idle:
-			if (self.can_afford(UnitTypeId.MARINE) and self.supply_left >= 1):
-				barrack.train(UnitTypeId.MARINE)
+			if (self.can_afford(unit) and self.supply_left >= 1):
+				barrack.train(unit)
 
 	async def build_bay(self):
 		if (not self.already_pending(UnitTypeId.ENGINEERINGBAY) and self.can_afford(UnitTypeId.ENGINEERINGBAY) and self.structures(UnitTypeId.ENGINEERINGBAY).amount < self.NUM_RESEARCHBAY):
@@ -103,19 +107,35 @@ class XackaBot(sc2.BotAI):
 			if location:
 				worker.build(UnitTypeId.ENGINEERINGBAY, location)
 
-	async def bay_research(self):
-		for bay in self.structures(UnitTypeId.ENGINEERINGBAY).idle:
-			if (self.can_afford(UpgradeId.TERRANINFANTRYWEAPONSLEVEL1)):
-				bay.research(UpgradeId.TERRANINFANTRYWEAPONSLEVEL1)
+	async def bay_research(self, upgrade):
+		if self.B_ACTIVATE:
+			for bay in self.structures(UnitTypeId.ENGINEERINGBAY).idle:
+				if (self.can_afford(upgrade)):
+					bay.research(upgrade)
+	
+	async def on_upgrade_complete(self, upgrade):
+		if(upgrade == UpgradeId.TERRANINFANTRYWEAPONSLEVEL1):
+			self.B_UPGRADE = UpgradeId.TERRANINFANTRYARMORSLEVEL1
 
 	async def check_build(self):
 		if self.units(UnitTypeId.SCV).amount == 16:
 			self.NUM_COMMANDCENTER = 2
 		elif self.structures(UnitTypeId.COMMANDCENTER).amount == 2:
-			self.NUM_BARRACKS = 1
+			self.NUM_BARRACKS = 2
+			self.NUM_BREACTOR = 1
+			self.NUM_REFINERY = 1
+		if self.units(UnitTypeId.SCV).amount == 35:
+			self.NUM_COMMANDCENTER = 3
+		elif self.structures(UnitTypeId.COMMANDCENTER).amount == 3:
+			self.NUM_BARRACKS = 4
+			self.NUM_BREACTOR = 4
+			self.NUM_REFINERY = 2
+			self.NUM_RESEARCHBAY = 1
+			self.B_ACTIVATE = True
+			self.B_UPGRADE = UpgradeId.TERRANINFANTRYWEAPONSLEVEL1
 
-	async def attack(self):
-		if (self.units(UnitTypeId.MARINE).amount > 20):
+	async def attack(self, stack):
+		if (self.units(UnitTypeId.MARINE).amount > stack):
 			for marine in self.units(UnitTypeId.MARINE).idle:
 				marine.attack(self.find_target(self.state))
 
@@ -130,6 +150,6 @@ class XackaBot(sc2.BotAI):
 			return self.enemy_start_locations[0]
 
 run_game(maps.get("Abyssal Reef LE"), [
-	Bot(Race.Terran, XackaBot(), fullscreen = False),
+	Bot(Race.Terran, XackaBot(), fullscreen = True),
 	Computer(Race.Terran, Difficulty.Medium)
 ], realtime = True)
